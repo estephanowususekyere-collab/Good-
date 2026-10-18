@@ -15,7 +15,7 @@ services:
     restart: on-failure
 
   migrate:
-    image: node:22-slim
+    build: ./server
     working_dir: /app
     volumes:
       - ./server:/app
@@ -25,14 +25,14 @@ services:
       - /run/base44/app.env
     environment:
       - DATABASE_URL=postgresql://monarch:monarch@db:5432/monarch
-    command: ["sh", "-ec", "npm install && npx prisma generate && npx prisma db push && npx tsx src/seed.ts"]
+    command: ["sh", "-ec", "npm install && npx prisma generate && npx prisma db push --accept-data-loss && npx tsx src/seed.ts"]
     depends_on:
       db:
         condition: service_healthy
     restart: "no"
 
   server:
-    image: node:22-slim
+    build: ./server
     working_dir: /app
     volumes:
       - ./server:/app

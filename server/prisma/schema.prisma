@@ -31,7 +31,7 @@ model Analysis {
 
 model Package {
   id            String    @id @default(cuid())
-  name          String
+  name          String      @unique
   description   String
   price         Int
   credits       Int
