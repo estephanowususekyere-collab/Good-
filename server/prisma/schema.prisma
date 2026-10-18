@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  name         String?
+  credits      Int         @default(0)
+  role         String      @default("user")
+  analyses     Analysis[]
+  payments     Payment[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Analysis {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  screenshot String
+  result     Json
+  createdAt DateTime @default(now())
+}
+
+model Package {
+  id            String    @id @default(cuid())
+  name          String
+  description   String
+  price         Int
+  credits       Int
+  stripePriceId String?
+  popular       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packageId       String?
+  stripeSessionId String?
+  amount          Int
+  credits         Int
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+}

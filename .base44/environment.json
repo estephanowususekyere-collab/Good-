@@ -1,0 +1,11 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    { "name": "JWT_SECRET", "description": "Secret key for signing JWT auth tokens", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "OPENAI_API_KEY", "description": "OpenAI API key for GPT-4o vision screenshot analysis (https://platform.openai.com/api-keys)", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "STRIPE_SECRET_KEY", "description": "Stripe secret key for payment processing (https://dashboard.stripe.com/apikeys)", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "STRIPE_WEBHOOK_SECRET", "description": "Stripe webhook signing secret for verifying payment events (https://dashboard.stripe.com/webhooks)", "requiredAtBoot": false, "generatedForDevelopment": true }
+  ]
+}
