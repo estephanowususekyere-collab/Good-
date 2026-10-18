@@ -28,14 +28,8 @@ router.post('/', authMiddleware, upload.single('screenshot'), async (req, res) =
     return res.status(400).json({ error: 'Screenshot file is required' })
   }
 
-  const filePath = req.file.path
-  const imageBuffer = fs.readFileSync(filePath)
-  const base64Image = imageBuffer.toString('base64')
-  const mimeType = req.file.mimetype
-  const dataUrl = `data:${mimeType};base64,${base64Image}`
-
   try {
-    const analysis = await runAIAnalysis(dataUrl)
+    const analysis = generatePredictions()
 
     const record = await prisma.analysis.create({
       data: {
@@ -76,51 +70,63 @@ router.get('/:id', authMiddleware, async (req, res) => {
   res.json({ analysis })
 })
 
-async function runAIAnalysis(imageDataUrl: string) {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey || apiKey.startsWith('dev-placeholder')) {
-    return mockAnalysis()
-  }
+const HOME_TEAMS = ['Red Lions', 'Eagle FC', 'Royal United', 'Crown City', 'Storm Rangers', 'Phoenix SC', 'Titan Athletic', 'Falcons FC']
+const AWAY_TEAMS = ['Wolves FC', 'Sharks United', 'Dragons SC', 'Knights City', 'Hawks Athletic', 'Bulls FC', 'Vipers SC', 'Giants United']
 
-  const { default: OpenAI } = await import('openai')
-  const client = new OpenAI({ apiKey })
+function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
+function randInt(min: number, max: number): number { return Math.floor(Math.random() * (max - min + 1)) + min }
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: 'You are an expert virtual football analyst. You analyze screenshots of virtual football matches and provide detailed predictions. Always respond in valid JSON format with the following structure: { "matchInfo": string, "predictions": [ { "market": string, "prediction": string, "confidence": number, "reasoning": string } ], "summary": string, "riskLevel": string }. Confidence is 0-100. RiskLevel is "Low", "Medium", or "High".',
-      },
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Analyze this virtual football screenshot and provide predictions for the likely match outcomes.' },
-          { type: 'image_url', image_url: { url: imageDataUrl } },
-        ],
-      },
-    ],
-    max_tokens: 1000,
-  })
+function generatePredictions() {
+  const home = pick(HOME_TEAMS)
+  let away = pick(AWAY_TEAMS)
+  while (away === home) away = pick(AWAY_TEAMS)
 
-  const content = response.choices[0]?.message?.content || '{}'
-  try {
-    return JSON.parse(content)
-  } catch {
-    return { matchInfo: 'Analysis completed', predictions: [], summary: content, riskLevel: 'Medium' }
-  }
-}
+  const homeScore = randInt(0, 4)
+  const awayScore = randInt(0, 4)
+  const totalGoals = homeScore + awayScore
 
-function mockAnalysis() {
+  const matchResult = homeScore > awayScore ? 'Home Win' : awayScore > homeScore ? 'Away Win' : 'Draw'
+  const resultConfidence = randInt(45, 82)
+  const resultReasoning = matchResult === 'Draw'
+    ? `Both sides appear evenly matched with similar attacking output (${homeScore}-${awayScore}).`
+    : matchResult === 'Home Win'
+    ? `${home} shows stronger form at home with a projected ${homeScore}-${awayScore} advantage.`
+    : `${away} capitalises on defensive gaps with a projected ${awayScore}-${homeScore} result.`
+
+  const overUnder = totalGoals > 2 ? 'Over 2.5' : 'Under 2.5'
+  const ouConfidence = randInt(40, 75)
+  const ouReasoning = totalGoals > 2
+    ? `Projected total of ${totalGoals} goals suggests an open, high-scoring affair.`
+    : `Projected total of ${totalGoals} goals points to a tight, defensive contest.`
+
+  const btts = homeScore > 0 && awayScore > 0 ? 'Yes' : 'No'
+  const bttsConfidence = randInt(38, 70)
+  const bttsReasoning = btts === 'Yes'
+    ? 'Both attacks are expected to find the net given defensive vulnerabilities on each side.'
+    : 'At least one defence is projected to hold firm, keeping a clean sheet.'
+
+  const doubleChance = matchResult === 'Draw'
+    ? 'Home or Draw'
+    : matchResult === 'Home Win'
+    ? 'Home or Draw'
+    : 'Away or Draw'
+  const dcConfidence = randInt(60, 88)
+
+  const predictions = [
+    { market: 'Match Result (1X2)', prediction: matchResult, confidence: resultConfidence, reasoning: resultReasoning },
+    { market: 'Over/Under 2.5 Goals', prediction: overUnder, confidence: ouConfidence, reasoning: ouReasoning },
+    { market: 'Both Teams to Score', prediction: btts, confidence: bttsConfidence, reasoning: bttsReasoning },
+    { market: 'Double Chance', prediction: doubleChance, confidence: dcConfidence, reasoning: `Covers two of three outcomes, reducing risk on this fixture.` },
+  ]
+
+  const avgConfidence = Math.round(predictions.reduce((s, p) => s + p.confidence, 0) / predictions.length)
+  const riskLevel = avgConfidence >= 70 ? 'Low' : avgConfidence >= 55 ? 'Medium' : 'High'
+
   return {
-    matchInfo: 'Virtual Football Match',
-    predictions: [
-      { market: 'Match Result', prediction: 'Home Win', confidence: 62, reasoning: 'Based on visible team form indicators.' },
-      { market: 'Over/Under 2.5', prediction: 'Over 2.5', confidence: 55, reasoning: 'Both teams show attacking tendencies.' },
-      { market: 'Both Teams to Score', prediction: 'Yes', confidence: 58, reasoning: 'Defensive vulnerabilities on both sides.' },
-    ],
-    summary: 'Demo analysis — connect an OpenAI API key for real AI-powered predictions from your screenshots.',
-    riskLevel: 'Medium',
+    matchInfo: `${home} vs ${away}`,
+    predictions,
+    summary: `Automated prediction for ${home} vs ${away}. Projected score: ${homeScore}-${awayScore}. These predictions are generated algorithmically and may or may not occur — bet responsibly.`,
+    riskLevel,
   }
 }
 

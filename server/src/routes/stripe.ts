@@ -7,7 +7,7 @@ const router = Router()
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 
 function getStripeClient() {
-  if (!STRIPE_SECRET_KEY || STRIPE_SECRET_KEY.startsWith('dev-placeholder')) return null
+  if (!STRIPE_SECRET_KEY || !STRIPE_SECRET_KEY.startsWith('sk_')) return null
   return new Stripe(STRIPE_SECRET_KEY)
 }
 
